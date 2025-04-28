@@ -7,14 +7,14 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
-        if (args.Length < 2)
+        if (args.Length < 1)
         {
-            Console.WriteLine("Usage: dtx2png <input.dtx> <output.png>");
+            Console.WriteLine("Usage: dtx2png <input.dtx> [output.png]");
             return;
         }
 
         var inputPath = args[0];
-        var outPath = args[1];
+        var outPath = args.Length < 2 ? Path.ChangeExtension(inputPath, ".png") : args[1];
 
         using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read);
         using var reader = new BinaryReader(stream);
