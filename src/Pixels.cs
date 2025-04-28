@@ -1,3 +1,5 @@
+namespace dtx2png;
+
 public struct Pixels
 {
     public byte[,] Data; // Matriz de pixels (índices de paleta)

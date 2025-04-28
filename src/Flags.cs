@@ -1,3 +1,5 @@
+namespace dtx2png;
+
 public enum Flags
 {
     FullBrite=1,

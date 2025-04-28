@@ -1,3 +1,5 @@
+namespace dtx2png;
+
 public struct AlphaMap
 {
     public byte[,] Alpha; // Matriz de valores de alfa (4 bits por pixel)

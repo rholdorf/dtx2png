@@ -1,5 +1,7 @@
 using System.Text;
 
+namespace dtx2png;
+
 public class Lights
 {
     public string LightDefs; // Dados de luz (tamanho variável)

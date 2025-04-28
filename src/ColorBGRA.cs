@@ -1,3 +1,5 @@
+namespace dtx2png;
+
 public struct ColorBGRA
 {
     public byte Alpha;

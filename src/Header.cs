@@ -1,3 +1,5 @@
+namespace dtx2png;
+
 public struct Header
 {
     public int Unknown1;

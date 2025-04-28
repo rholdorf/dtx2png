@@ -1,5 +1,7 @@
 using System.Text;
 
+namespace dtx2png;
+
 public struct LTString
 {
     public ushort Length;

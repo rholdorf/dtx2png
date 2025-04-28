@@ -1,16 +1,16 @@
+namespace dtx2png;
+
 public class DtxFile
 {
     public Header Header;
-    public ColorBGRA[] Colours;
-    public Pixels[] Mipmaps;
-    public AlphaMap[] AlphaMaps;
+    public ColorBGRA[]? Colours;
+    public Pixels[]? Mipmaps;
+    public AlphaMap[]? AlphaMaps;
     public Lights? Lights;
     public ColorBGRA[] PixelData;
 
-    public static DtxFile ReadFromFile(string filePath)
+    public static DtxFile Read(BinaryReader reader)
     {
-        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-        using var reader = new BinaryReader(stream);
 
         var dtxFile = new DtxFile
         {
