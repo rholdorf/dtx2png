@@ -22,13 +22,19 @@ internal static class Program
 
         var dtxFile = DtxFile.Read(reader);
         PrintDtxInfo(dtxFile);
+        if(!dtxFile.Header.Supported)
+        {
+            Console.WriteLine("Unsupported DTX format.");
+            return;
+        }
 
-        for (var imageIndex = 0; imageIndex < dtxFile.Header.MipmapCount; imageIndex++)
+        var imageIndex = 0;
+        foreach (var current in dtxFile.Colours)
         {
             var mipWidth = DivideByPowerOfTwo(dtxFile.Header.Width, imageIndex);
             var mipHeight = DivideByPowerOfTwo(dtxFile.Header.Height, imageIndex);
 
-            using var img = FromColorArray(dtxFile.Colours[imageIndex], mipWidth, mipHeight);
+            using var img = FromColorArray(current, mipWidth, mipHeight);
 
             if (imageIndex == 0)
             {
@@ -41,6 +47,8 @@ internal static class Program
                 img.Save(mipPath);
                 Console.WriteLine($"Saved mipmap {imageIndex} to {mipPath}");
             }
+            
+            imageIndex++;
         }
     }
 
