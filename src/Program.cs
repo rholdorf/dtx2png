@@ -1,5 +1,7 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 
 namespace dtx2png;
 
@@ -14,91 +16,119 @@ internal static class Program
         }
 
         var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
-        
-        try
+
+        using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
+        using var reader = new BinaryReader(stream);
+
+        var dtxFile = DtxFile.Read(reader);
+        PrintDtxInfo(dtxFile);
+
+        for (var imageIndex = 0; imageIndex < dtxFile.Header.MipmapCount; imageIndex++)
         {
-            using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
-            using var reader = new BinaryReader(stream);
+            var mipWidth = DivideByPowerOfTwo(dtxFile.Header.Width, imageIndex);
+            var mipHeight = DivideByPowerOfTwo(dtxFile.Header.Height, imageIndex);
 
-            var dtxFile = DtxFile.Read(reader);
-            PrintDtxInfo(dtxFile);
+            using var img = FromColorArray(dtxFile.Colours[imageIndex], mipWidth, mipHeight);
 
-            if (dtxFile.Header.Flags == Flags.Unknown2)
+            if (imageIndex == 0)
             {
-                using var img = new Image<Rgba32>(dtxFile.Header.Width, dtxFile.Header.Height);
-                var i = 0;
-                for (var y = 0; y < dtxFile.Header.Height; y++)
-                {
-                    for (var x = 0; x < dtxFile.Header.Width; x++)
-                    {
-                        var color = dtxFile.PixelData[i];
-                        img[x, y] = new Rgba32(color.Red, color.Green, color.Blue, color.Alpha);
-                        i++;
-                    }
-                }
-
                 img.Save(outPath);
                 Console.WriteLine($"Saved image to {outPath}");
             }
             else
             {
-                for (var i = 0; i < dtxFile.Mipmaps.Length; i++)
-                {
-                    var currentMipmap = dtxFile.Mipmaps[i];
-                    var outputPath = Path.ChangeExtension(args[0], $"_mipmap_{i}.png");
-
-                    using var img = new Image<Rgba32>(dtxFile.Header.Width, dtxFile.Header.Height);
-                    for (var y = 0; y < dtxFile.Header.Height; y++)
-                    {
-                        for (var x = 0; x < dtxFile.Header.Width; x++)
-                        {
-                            var index = currentMipmap.Data[x, y];
-                            var color = dtxFile.Colours[index];
-                            img[x, y] = new Rgba32(color.Red, color.Green, color.Blue, color.Alpha);
-                        }
-                    }
-
-                    img.Save(outputPath);
-                    Console.WriteLine($"Saved mipmap {i} to {outputPath}");
-                }
+                var mipPath = Path.ChangeExtension(outPath, $"_mipmap_{imageIndex}.png");
+                img.Save(mipPath);
+                Console.WriteLine($"Saved mipmap {imageIndex} to {mipPath}");
             }
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"ERR - File: {args[0]} - {e.Message}");
         }
     }
 
+    private static Image FromColorArray(ColorBGRA[] colors, int width, int height)
+    {
+        var ret = new Image<Rgba32>(width, height);
+        var i = 0;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var color = colors[i];
+                ret[x, y] = new Rgba32(color.Red, color.Green, color.Blue, color.Alpha);
+                i++;
+            }
+        }
+
+        return ret;
+    }
+    
+    private static int DivideByPowerOfTwo(int value, int power)
+    {
+        var ret = value >> power;
+        if(ret <1)
+            ret = 1;
+        return ret;
+    }
+
+    private static void Print(string name)
+    {
+        Console.Write(name);
+        Console.Write(": \t");        
+    }
+    private static void Print(string name, int value)
+    {
+        Print(name);
+        Console.WriteLine($"{BinaryPrimitives.ReverseEndianness(value):X8} ({value})");
+    }
+    
+    private static void Print(string name, ushort value)
+    {
+        Print(name);
+        Console.WriteLine($"{BinaryPrimitives.ReverseEndianness(value):X4} ({value})");
+    }    
+    
+    private static void Print(string name, uint value)
+    {
+        Print(name);
+        Console.WriteLine($"{BinaryPrimitives.ReverseEndianness(value):X4} ({value})");
+    }    
+    
+    private static void Print(string name, byte value)
+    {
+        Print(name);
+        Console.WriteLine($"{BinaryPrimitives.ReverseEndianness(value):X2} ({value})");
+    }    
+    
     private static void PrintDtxInfo(DtxFile dtxFile)
     {
-        Console.WriteLine($"Unknown1: {dtxFile.Header.Unknown1}");
-        Console.WriteLine($"Version: {dtxFile.Header.Version}");
-        Console.WriteLine($"Width: {dtxFile.Header.Width}, Height: {dtxFile.Header.Height}");
-        Console.WriteLine($"Mipmap Count: {dtxFile.Header.MipmapCount}");
-        Console.WriteLine($"Has Lights: {dtxFile.Header.HasLights != 0}");
-        Console.WriteLine($"Flags: {dtxFile.Header.Flags.ToString()}");
-        Console.WriteLine($"\tFullBright: {dtxFile.Header.FullBright}");
-        Console.WriteLine($"\tAlpha Maks: {dtxFile.Header.AlphaMasks}");
-        Console.WriteLine($"\tFlag Unknown1: {dtxFile.Header.FlagUnknown1}");
-        Console.WriteLine($"\tFlag Unknown2: {dtxFile.Header.FlagUnknown2}");
-        Console.WriteLine($"\tFlag Unknown3: {dtxFile.Header.FlagUnknown3}");
-        Console.WriteLine($"\tMap to master palette: {dtxFile.Header.MapToMasterPalette}");
-        Console.WriteLine($"Surface Flags: 0x{dtxFile.Header.SurfaceFlags:X}");
-        Console.WriteLine($"Group: {dtxFile.Header.Group}");
-        Console.WriteLine($"Mipmaps Used Count: {dtxFile.Header.MipmapsUsedCount}");
-        Console.WriteLine($"Alpha Cutoff: {dtxFile.Header.AlphaCutoff}");
-        Console.WriteLine($"Alpha Average: {dtxFile.Header.AlphaAverage}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown2}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown3}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown4}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown5}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown6}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown7}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown8}");
-        Console.WriteLine($"Unknown2: {dtxFile.Header.Unknown9}");
+        Print("Unknown1..........", dtxFile.Header.Unknown1);
+        Print("Version...........", dtxFile.Header.Version);
+        Print("Width.............", dtxFile.Header.Width);
+        Print("Height............", dtxFile.Header.Height);
+        Print("Mipmap Count......", dtxFile.Header.MipmapCount);
+        Print("Has Lights........", dtxFile.Header.HasLights);
+        Print("Flags.............", dtxFile.Header.Flags);
+        Print("Surface Flags.....", dtxFile.Header.SurfaceFlags);
+        Print("Group.............", dtxFile.Header.Group);
+        Print("Mipmaps Used Count", dtxFile.Header.MipmapsUsedCount);
+        Print("Alpha Cutoff......", dtxFile.Header.AlphaCutoff);
+        Print("Alpha Average.....", dtxFile.Header.AlphaAverage);
+        Print("Unknown2..........", dtxFile.Header.Unknown2);
+        Print("Unknown3..........", dtxFile.Header.Unknown3);
+        Print("Unknown4..........", dtxFile.Header.Unknown4);
+        Print("Unknown5..........", dtxFile.Header.Unknown5);
+        Print("Unknown6..........", dtxFile.Header.Unknown6);
+        Print("Unknown7..........", dtxFile.Header.Unknown7);
+        Print("Unknown8..........", dtxFile.Header.Unknown8);
+        Print("Unknown9..........", dtxFile.Header.Unknown9);
         
-        Console.Write("Color Palette Size: ");
-        Console.WriteLine(dtxFile.Colours != null ? $"{dtxFile.Colours.Length}" : "Not present.");
+        //Console.WriteLine($"\tFullBright: {dtxFile.Header.FullBright}");
+        //Console.WriteLine($"\tAlpha Maks: {dtxFile.Header.AlphaMasks}");
+        //Console.WriteLine($"\tFlag Unknown1: {dtxFile.Header.FlagUnknown1}");
+        //Console.WriteLine($"\tFlag Unknown2: {dtxFile.Header.FlagUnknown2}");
+        //Console.WriteLine($"\tFlag Unknown3: {dtxFile.Header.FlagUnknown3}");
+        //Console.WriteLine($"\tMap to master palette: {dtxFile.Header.MapToMasterPalette}");
+        //Console.Write("Color Palette Size: ");
+        //Console.WriteLine(dtxFile.Colours != null ? $"{dtxFile.Colours.Length}" : "Not present.");
         Console.Write("Lights Count: ");
         Console.WriteLine(dtxFile.Header.HasLights != 0 && dtxFile.Lights != null
             ? $"{dtxFile.Lights.String.Length}"

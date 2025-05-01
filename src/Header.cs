@@ -5,16 +5,16 @@ namespace dtx2png;
 public struct Header
 {
     public int Unknown1;
-    public int Version; // Sempre -2 (DTX_VERSION)
+    public int Version;
     public ushort Width;
     public ushort Height;
-    public ushort MipmapCount; // Pode ser mipmaps ou bytes por pixel, frequentemente 4
+    public ushort MipmapCount;
     public ushort HasLights;
-    public Flags Flags; // Flags em formato hexadecimal
-    public uint SurfaceFlags; // Tipo de superfície (ex.: pedra, metal, etc.)
+    public int Flags;
+    public uint SurfaceFlags;
     public byte Group;
-    public byte MipmapsUsedCount; // 0 = 4?
-    public byte AlphaCutoff; // Limitado a [128-255]
+    public byte MipmapsUsedCount;
+    public byte AlphaCutoff;
     public byte AlphaAverage;
     public uint Unknown2;
     public uint Unknown3;
@@ -26,7 +26,7 @@ public struct Header
     public ushort Unknown9;
 
     /// <summary>
-    /// This DTX has fullbrite colors (this means palette index 255 will be unaffected by lighting)
+    /// This DTX has full bright colors (this means palette index 255 will be unaffected by lighting)
     /// </summary>
     public bool FullBright;
 
@@ -65,7 +65,7 @@ public struct Header
         ret.Height = reader.ReadUInt16();
         ret.MipmapCount = reader.ReadUInt16();
         ret.HasLights = reader.ReadUInt16();
-        
+
         var flags = reader.ReadUInt32();
 
         ret.FullBright = (flags & 0x01) != 0;
@@ -74,9 +74,9 @@ public struct Header
         ret.FlagUnknown2 = (flags & 0x08) != 0;
         ret.FlagUnknown3 = (flags & 0x10) != 0;
         ret.MapToMasterPalette = (flags & 0x20) != 0;
-        
-        ret.Flags = (Flags)Convert.ToInt32(flags);
-        
+
+        ret.Flags = Convert.ToInt32(flags);
+
         ret.SurfaceFlags = reader.ReadUInt32();
         ret.Group = reader.ReadByte();
         ret.MipmapsUsedCount = reader.ReadByte();

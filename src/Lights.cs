@@ -4,8 +4,8 @@ namespace dtx2png;
 
 public class Lights
 {
-    public string LightDefs; // Dados de luz (tamanho variável)
-    public byte[] Unknown; // 18 bytes desconhecidos
+    public string? LightDefs; // Dados de luz (tamanho variável)
+    public byte[]? Unknown; // 18 bytes desconhecidos
     public LTLongString String;
 
     public static Lights Read(BinaryReader reader)
