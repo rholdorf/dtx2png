@@ -21,17 +21,17 @@ public class DtxFile
 
         dtxFile.Colours = new List<ColorBGRA[]>(dtxFile.Header.MipmapCount);
         
-        reader.BaseStream.Seek(120, SeekOrigin.Current); // TODO: Why 120? What are these skipped bytes?            
+            reader.BaseStream.Seek(120, SeekOrigin.Current); // TODO: Why 120? What are these skipped bytes?            
         if (dtxFile.Header.Flags == 8)
         {
             dtxFile.Colours.Add(ReadColorData(reader, dtxFile.Header.Width, dtxFile.Header.Height));
         }
         else
         {
-            reader.BaseStream.Seek(682 - 120 - 40, SeekOrigin.Begin);
+            //reader.BaseStream.Seek(512-(128*4), SeekOrigin.Current);
 
             // Leitura da paleta de cores (sempre 256 cores)
-            reader.BaseStream.Seek(256*4, SeekOrigin.Current);
+            //reader.BaseStream.Seek(256*4, SeekOrigin.Current);
             
             //dtxFile.Colours = new ColorBGRA[256];
             //for (var i = 0; i < 256; i++)
