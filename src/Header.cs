@@ -10,10 +10,10 @@ public struct Header
     public ushort Width;
     public ushort Height;
     public ushort MipmapCount;
-    public ushort HasLights;
-    public int Flags;
+    public ushort Fmt1;
+    public int Fmt2;
     public uint SurfaceFlags;
-    public byte Group;
+    public byte Fmt3;
     public byte MipmapsUsedCount;
     public byte AlphaCutoff;
     public byte AlphaAverage;
@@ -27,10 +27,15 @@ public struct Header
     public ushort Unknown9;
     public bool Supported;
 
+    public PixelFormat PixelFormat;
+
     public static Header Read(BinaryReader reader)
     {
-        var ret = new Header();
-        
+        var ret = new Header
+        {
+            Supported = true
+        };
+
         if (reader.BaseStream.Length < 8)
         {
             Debug.WriteLine("File too small to be a DTX");
@@ -40,36 +45,81 @@ public struct Header
         
         ret.Unknown1 = reader.ReadInt32();
         ret.Version = reader.ReadInt32();
-        
-        if(ret.Unknown1!= 0 || ret.Version != -5)
+
+        if (ret.Unknown1 != 0 || ret.Version != -5)
         {
-            Debug.WriteLine("Unknown1 or Version not matching");
+            Debug.WriteLine("Unknown or Version not matching");
             ret.Supported = false;
             return ret;
         }
 
-        ret.Supported = true;
         ret.Width = reader.ReadUInt16();
         ret.Height = reader.ReadUInt16();
-        ret.MipmapCount = reader.ReadUInt16();
-        ret.HasLights = reader.ReadUInt16();
+        
+        ret.MipmapCount = reader.ReadUInt16(); // uint
+        ret.Fmt1 = reader.ReadUInt16(); // uint
+        ret.Fmt2 = (int)reader.ReadUInt32(); // uint
+        ret.SurfaceFlags = reader.ReadUInt32(); // short
+        ret.Fmt3 = reader.ReadByte(); // ushort
 
-        ret.Flags = (int)reader.ReadUInt32();
-
-        ret.SurfaceFlags = reader.ReadUInt32();
-        ret.Group = reader.ReadByte();
-        ret.MipmapsUsedCount = reader.ReadByte();
-        ret.AlphaCutoff = reader.ReadByte();
-        ret.AlphaAverage = reader.ReadByte();
-        ret.Unknown2 = reader.ReadUInt32();
-        ret.Unknown3 = reader.ReadUInt32();
-        ret.Unknown4 = reader.ReadByte();
-        ret.Unknown5 = reader.ReadByte();
-        ret.Unknown6 = reader.ReadUInt16();
-        ret.Unknown7 = reader.ReadByte();
-        ret.Unknown8 = reader.ReadByte();
-        ret.Unknown9 = reader.ReadUInt16();
-
+        reader.BaseStream.Seek(135, SeekOrigin.Current); // go to pixel data
+        SetPixelFormat(ref ret);
         return ret;
     }
+    
+    private static void SetPixelFormat(ref Header header)
+    {
+        switch (header.Fmt3)
+        {
+            case >= 0 and <= 3:
+            {
+                header.PixelFormat = PixelFormat.Bgra;
+                switch (header.Fmt1)
+                {
+                    case 0x8:
+                        header.PixelFormat = PixelFormat.Rgb24;
+                        break;
+                    case 0x88:
+                        header.PixelFormat = PixelFormat.Rgba32;
+                        break;
+                }
+
+                break;
+            }
+            case 4:
+                header.PixelFormat = PixelFormat.Dtx1;
+                break;
+            case 6:
+                header.PixelFormat = PixelFormat.Dtx5;
+                break;
+        }
+    }   
+}
+
+public enum PixelFormat
+{
+    /// <summary>
+    /// 4 * width * height (raw read)
+    /// </summary>
+    Bgra,
+    
+    /// <summary>
+    /// b8g8r8 (encoded)
+    /// </summary>
+    Rgb24,
+    
+    /// <summary>
+    /// b8g8r8a8 (encoded)
+    /// </summary>
+    Rgba32,
+    
+    /// <summary>
+    /// 8 * width * height (raw read)
+    /// </summary>
+    Dtx1,
+    
+    /// <summary>
+    /// 16 * width * height (raw read)
+    /// </summary>
+    Dtx5
 }

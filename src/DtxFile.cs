@@ -21,8 +21,8 @@ public class DtxFile
 
         dtxFile.Colours = new List<ColorBGRA[]>(dtxFile.Header.MipmapCount);
         
-            reader.BaseStream.Seek(120, SeekOrigin.Current); // TODO: Why 120? What are these skipped bytes?            
-        if (dtxFile.Header.Flags == 8)
+        //reader.BaseStream.Seek(120, SeekOrigin.Current); // TODO: Why 120? What are these skipped bytes?            
+        if (dtxFile.Header.Fmt2 == 8)
         {
             dtxFile.Colours.Add(ReadColorData(reader, dtxFile.Header.Width, dtxFile.Header.Height));
         }
