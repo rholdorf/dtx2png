@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -50,10 +51,10 @@ public static class Util
         Print("Width.............", dtxFile.Header.Width);
         Print("Height............", dtxFile.Header.Height);
         Print("Mipmap Count......", dtxFile.Header.MipmapCount);
-        Print("Has Lights........", dtxFile.Header.Fmt1);
-        Print("Flags.............", dtxFile.Header.Fmt2);
+        Print("Fmt1..............", dtxFile.Header.Fmt1);
+        Print("Fmt2..............", dtxFile.Header.Fmt2);
         Print("Surface Flags.....", dtxFile.Header.SurfaceFlags);
-        Print("Group.............", dtxFile.Header.Fmt3);
+        Print("Fmt3..............", dtxFile.Header.Fmt3);
         Print("Mipmaps Used Count", dtxFile.Header.MipmapsUsedCount);
         Print("Alpha Cutoff......", dtxFile.Header.AlphaCutoff);
         Print("Alpha Average.....", dtxFile.Header.AlphaAverage);
@@ -65,41 +66,47 @@ public static class Util
         Print("Unknown7..........", dtxFile.Header.Unknown7);
         Print("Unknown8..........", dtxFile.Header.Unknown8);
         Print("Unknown9..........", dtxFile.Header.Unknown9);
-        
-        //Console.WriteLine($"\tFullBright: {dtxFile.Header.FullBright}");
-        //Console.WriteLine($"\tAlpha Maks: {dtxFile.Header.AlphaMasks}");
-        //Console.WriteLine($"\tFlag Unknown1: {dtxFile.Header.FlagUnknown1}");
-        //Console.WriteLine($"\tFlag Unknown2: {dtxFile.Header.FlagUnknown2}");
-        //Console.WriteLine($"\tFlag Unknown3: {dtxFile.Header.FlagUnknown3}");
-        //Console.WriteLine($"\tMap to master palette: {dtxFile.Header.MapToMasterPalette}");
-        //Console.Write("Color Palette Size: ");
-        //Console.WriteLine(dtxFile.Colours != null ? $"{dtxFile.Colours.Length}" : "Not present.");
-        Console.Write("Lights Count: ");
-        Console.WriteLine(dtxFile.Header.Fmt1 != 0 && dtxFile.Lights != null
-            ? $"{dtxFile.Lights.String.Length}"
-            : "Not present.");
-
-        Console.Write("Light Definitions: ");
-        Console.WriteLine(dtxFile.Header.Fmt1 != 0 && dtxFile.Lights != null
-            ? $"{dtxFile.Lights.LightDefs}"
-            : "Not present.");
     }    
 
-    public static Image FromColorArray(ColorBGRA[] colors, int width, int height)
+    public static Image FromTexture(Texture texture)
     {
-        var ret = new Image<Rgba32>(width, height);
+        var ret = new Image<Rgba32>(texture.Width, texture.Height);
         var i = 0;
-        for (var y = 0; y < height; y++)
+        byte red = 0, green = 0, blue = 0, alpha = 0;
+        for (var y = 0; y < texture.Height; y++)
         {
-            for (var x = 0; x < width; x++)
+            for (var x = 0; x < texture.Width; x++)
             {
-                var color = colors[i];
-                ret[x, y] = new Rgba32(color.Red, color.Green, color.Blue, color.Alpha);
-                i++;
+                if (texture.Format == TextureFormat.RGBA)
+                {
+                    red = texture.PixelData[i++];
+                    green = texture.PixelData[i++];
+                    blue = texture.PixelData[i++];
+                    alpha = texture.PixelData[i++];
+                }
+                else if (texture.Format == TextureFormat.BGRA)
+                {
+                    blue = texture.PixelData[i++];
+                    green = texture.PixelData[i++];
+                    red = texture.PixelData[i++];
+                    alpha = texture.PixelData[i++];                    
+                }
+
+                ret[x, y] = new Rgba32(red, green, blue, alpha);
             }
         }
 
         return ret;
     }    
     
+    
+    public static byte SafeReadByte(BinaryReader reader)
+    {
+        if (reader.BaseStream.Position < reader.BaseStream.Length)
+        {
+            return reader.ReadByte();
+        }
+        Debug.WriteLine("EOF reached while reading byte.");
+        return 0x00;
+    }
 }

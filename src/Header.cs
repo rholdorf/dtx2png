@@ -27,8 +27,6 @@ public struct Header
     public ushort Unknown9;
     public bool Supported;
 
-    public PixelFormat PixelFormat;
-
     public static Header Read(BinaryReader reader)
     {
         var ret = new Header
@@ -63,63 +61,7 @@ public struct Header
         ret.Fmt3 = reader.ReadByte(); // ushort
 
         reader.BaseStream.Seek(135, SeekOrigin.Current); // go to pixel data
-        SetPixelFormat(ref ret);
         return ret;
     }
-    
-    private static void SetPixelFormat(ref Header header)
-    {
-        switch (header.Fmt3)
-        {
-            case >= 0 and <= 3:
-            {
-                header.PixelFormat = PixelFormat.Bgra;
-                switch (header.Fmt1)
-                {
-                    case 0x8:
-                        header.PixelFormat = PixelFormat.Rgb24;
-                        break;
-                    case 0x88:
-                        header.PixelFormat = PixelFormat.Rgba32;
-                        break;
-                }
 
-                break;
-            }
-            case 4:
-                header.PixelFormat = PixelFormat.Dtx1;
-                break;
-            case 6:
-                header.PixelFormat = PixelFormat.Dtx5;
-                break;
-        }
-    }   
-}
-
-public enum PixelFormat
-{
-    /// <summary>
-    /// 4 * width * height (raw read)
-    /// </summary>
-    Bgra,
-    
-    /// <summary>
-    /// b8g8r8 (encoded)
-    /// </summary>
-    Rgb24,
-    
-    /// <summary>
-    /// b8g8r8a8 (encoded)
-    /// </summary>
-    Rgba32,
-    
-    /// <summary>
-    /// 8 * width * height (raw read)
-    /// </summary>
-    Dtx1,
-    
-    /// <summary>
-    /// 16 * width * height (raw read)
-    /// </summary>
-    Dtx5
 }

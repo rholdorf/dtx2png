@@ -18,21 +18,6 @@ internal static class Program
         Do1(args);
     }
 
-    private static void Do2(string[] args)
-    {
-        using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
-        using var reader = new BinaryReader(stream);
-        var data = reader.ReadBytes((int)stream.Length);
-
-        if (!LithTechTextureLoader.CheckType(data))
-        {
-            Console.WriteLine("Not a DTX file.");
-            return;
-        }
-
-        var textures = LithTechTextureLoader.LoadRgba(data);
-    }
-
     private static void Do1(string[] args)
     {
         var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
@@ -40,21 +25,24 @@ internal static class Program
         using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
         using var reader = new BinaryReader(stream);
 
-        var dtxFile = DtxFile.Read(reader);
+        var dtxFile = new DtxFile(reader);
         Util.PrintDtxInfo(dtxFile);
         if (!dtxFile.Header.Supported)
         {
-            Console.WriteLine("Unsupported DTX format.");
+            Console.WriteLine("ERR: Unsupported DTX format.");
             return;
         }
 
-        var imageIndex = 0;
-        foreach (var current in dtxFile.Colours)
+        if (dtxFile.Textures?.Count == 0)
         {
-            var mipWidth = Util.DivideByPowerOfTwo(dtxFile.Header.Width, imageIndex);
-            var mipHeight = Util.DivideByPowerOfTwo(dtxFile.Header.Height, imageIndex);
-
-            using var img = Util.FromColorArray(current, mipWidth, mipHeight);
+            Console.WriteLine("ERR: No dtx textures found.");
+            return;
+        }
+        
+        var imageIndex = 0;
+        foreach (var current in dtxFile.Textures)
+        {
+            using var img = Util.FromTexture(current);
 
             if (imageIndex == 0)
             {

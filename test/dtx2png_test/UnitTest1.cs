@@ -18,7 +18,7 @@ public class UnitTest1
         using var reader = GetReader();
         
         // Act
-        var dtxFile = DtxFile.Read(reader);
+        var dtxFile = new DtxFile(reader);
         
         // Assert
         Assert.True(dtxFile.Header.Supported);
@@ -31,10 +31,10 @@ public class UnitTest1
         using var reader = GetReader();
         
         // act
-        var dtxFile = DtxFile.Read(reader);
+        var dtxFile = new DtxFile(reader);
         
         // assert
-        Assert.Single(dtxFile.Colours);
+        Assert.Single(dtxFile.Textures);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class UnitTest1
         using var reader = GetReader();
         
         // act
-        var dtxFile = DtxFile.Read(reader);
+        var dtxFile = new DtxFile(reader);
         
         // assert
         Assert.Equal(128, dtxFile.Header.Width);        
@@ -58,9 +58,9 @@ public class UnitTest1
         using var reader = GetReader();
 
         // act
-        var dtxFile = DtxFile.Read(reader);
-        var current = dtxFile.Colours[0];
-        using var img = Util.FromColorArray(current, dtxFile.Header.Width, dtxFile.Header.Height);
+        var dtxFile = new DtxFile(reader);
+        var current = dtxFile.Textures[0];
+        using var img = Util.FromTexture(current);
         using var outStream = new MemoryStream();
         img.Save(outStream, new PngEncoder());
 
