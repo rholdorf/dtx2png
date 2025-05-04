@@ -3,11 +3,11 @@
 namespace dtx2png_test;
 using dtx2png;
 
-public class UnitTest1
+public class RgbaDtx
 {
     private BinaryReader GetReader()
     {
-        var data = MockConsoleFontFile.GetDtxData();
+        var data = MockDtxFiles.GetRgbaDtxData();
         return new BinaryReader(new MemoryStream(data));
     }
     
@@ -50,6 +50,19 @@ public class UnitTest1
         Assert.Equal(128, dtxFile.Header.Width);        
         Assert.Equal(128, dtxFile.Header.Height);
     }
+    
+    [Fact]
+    public void DtxIsRgba()
+    {
+        // Arrange
+        using var reader = GetReader();
+        
+        // act
+        var dtxFile = new DtxFile(reader);
+        
+        // assert
+        Assert.Equal(TextureFormat.RGBA, dtxFile.Textures[0].Format);        
+    }    
 
     [Fact]
     public void DtxConvertsToPng()
@@ -65,6 +78,6 @@ public class UnitTest1
         img.Save(outStream, new PngEncoder());
 
         // assert
-        Assert.Equal(MockConsoleFontFile.GetPngData(), outStream.ToArray());
+        Assert.Equal(MockDtxFiles.GetRgbaPngData(), outStream.ToArray());
     }
 }
