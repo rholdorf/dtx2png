@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text;
 using BCnEncoder.Decoder;
 using BCnEncoder.Shared;
-using dtx2png;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -67,8 +66,6 @@ public class DTX
 
 	public void Read(BinaryReader f)
 	{
-		//image = null;
-
 		resource_type = f.ReadInt32();
 
 		if (resource_type != 0)
@@ -82,42 +79,32 @@ public class DTX
 			return;
 		}
 
-		width = f.ReadUInt16();
-		height = f.ReadUInt16();
-		mipmap_count = f.ReadUInt16();
-		section_count = f.ReadUInt16();
-		flags = f.ReadUInt32();
-		user_flags = f.ReadUInt32();
-
-		texture_group = f.ReadByte();
-		mipmaps_to_use = f.ReadByte();
-		bytes_per_pixel = f.ReadByte();
-		mipmap_offset = f.ReadByte();
-		mipmap_tex_coord_offset = f.ReadByte();
-		texture_priority = f.ReadByte();
-		detail_texture_scale = f.ReadSingle();
-		detail_texture_angle = f.ReadUInt16();
+		width = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
+		height = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
+		mipmap_count = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
+		section_count = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
+		flags = f.ReadUInt32(); // get_32 - unsigned integer as 32 bits
+		user_flags = f.ReadUInt32(); // get_32 - unsigned integer as 32 bits
+		texture_group = f.ReadByte(); // get_8 - integer as 8 bits
+		mipmaps_to_use = f.ReadByte(); // get_8 - integer as 8 bits
+		bytes_per_pixel = f.ReadByte(); // get_8 - integer as 8 bits
+		mipmap_offset = f.ReadByte(); // get_8 - integer as 8 bits
+		mipmap_tex_coord_offset = f.ReadByte(); // get_8 - integer as 8 bits
+		texture_priority = f.ReadByte(); // get_8 - integer as 8 bits
+		detail_texture_scale = f.ReadSingle(); // get_float - float as 32 bits
+		detail_texture_angle = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
 
 		if (DTX_VERSION_LT15 == version || DTX_VERSION_LT2 == version)
 		{
-			command_string = Encoding.ASCII.GetString(f.ReadBytes(DTX_COMMANDSTRING_LENGTH));
+			command_string = Encoding.ASCII.GetString(f.ReadBytes(DTX_COMMANDSTRING_LENGTH)).TrimEnd('\0');
 		}
 		
 		ReadTextureData(f);
-
-		//this.image = this.read_texture_data(f)
-
-		//if this.image == null:
-		//return this._make_response(IMPORT_RETURN.ERROR, "Couldn't create image. BPP value: %s" % this.bytes_per_pixel)
-
-
-		//return this._make_response(IMPORT_RETURN.SUCCESS)
 	}
 	
 	/*
     func read_texture_data(f: File):
 	   		var image: Image = null
-	   
 	   
 	   		if [DTX_VERSION_LT1, DTX_VERSION_LT15].has(this.version) or this.bytes_per_pixel == BPP_8P:
 	   			image = this.read_8bit_palette(f)
@@ -160,8 +147,6 @@ public class DTX
 	/*
 	func read_compressed(f: File):
 	   	var image = Image.new()
-
-
 	   	var format = Image.FORMAT_DXT1
 	   	var scale = 8
 
@@ -174,11 +159,8 @@ public class DTX
 
 	   	var compressed_width = int((this.width + 3) / 4)
 	   	var compressed_height = int((this.height + 3) / 4)
-
 	   	var data = f.get_buffer(compressed_width * compressed_height * scale)
-
 	   	image.create_from_data(this.width, this.height, false, format, data)
-
 	   	return image	 
 	 */
 	private void ReadCompressed(BinaryReader f)
@@ -237,11 +219,7 @@ public class DTX
 		}
 
 		image.Save("/Users/rui/src/tron/scratch/CELLPHONE_x.png", new PngEncoder());
-		
-
 	}
-	
-	
 	
 	/*
 	func read_8bit_palette(f: File):
@@ -304,6 +282,7 @@ public class DTX
 		}
 	}
 }
+
 /*
 
 	func read_32bit_texture(f: File):
@@ -312,59 +291,36 @@ public class DTX
 		image.create_from_data(this.width, this.height, false, Image.FORMAT_RGBA8, data)
 		return image
 
-
-
-
-
-
 	func read_32bit_palette(f: File):
 		var image = Image.new()
 		var palette = []
-
 		var data = f.get_buffer(this.width * this.height * 1)
 		var colour_data = PoolByteArray()
-
-
-
 		var width = this.width
 		var height = this.height
 		for _i in range(this.mipmap_count - 1):
 			width /= 2
 			height /= 2
-
 			var _unused = f.get_buffer(width * height * 1)
-
-
 
 		if this.section_count != 1:
 			print("Section count is not 1, even though we're a 32bit palette texture! Count: ", this.section_count)
 			return null
 
-
 		var _section_type = f.get_buffer(16)
 		var _section_unk = f.get_buffer(12)
 		var _section_length = f.ReadUInt32()
 
-
 		for _i in range(256):
-
 			var packed_data = f.ReadUInt32()
 			var unpacked_data = this.convert_32_to_8_bit(packed_data)
-
-
 			var a = 255 - unpacked_data.w
-
-
 			var r = unpacked_data.x
 			var g = unpacked_data.y
 			var b = unpacked_data.z
-
-
 			palette.append(Quat(r, g, b, a))
 
-
 		var i = 0
-
 
 		while (i < data.size()):
 			colour_data.append(palette[data[i]].x)
@@ -373,31 +329,18 @@ public class DTX
 			colour_data.append(palette[data[i]].w)
 			i += 1
 
-
 		image.create_from_data(this.width, this.height, false, Image.FORMAT_RGBA8, colour_data)
 		return image
 
-
-
-
-
-
-
-
-
-
 	func _make_response(code, message = ""):
 		return {"code": code, "message": message}
-
 
 	func convert_32_to_8_bit(value):
 		var a = (value & -16777216) >> 24
 		var r = (value & 16711680) >> 16
 		var g = (value & 65280) >> 8
 		var b = (value & 255)
-
 		return Quat(r, g, b, a)
-
 
 	func read_string(file: File, is_length_a_short = true):
 		var length = 0
@@ -406,9 +349,7 @@ public class DTX
 		else:
 			length = file.ReadUInt32()
 
-
 		return file.get_buffer(length).get_string_from_ascii()
-
 
 	func read_vector2(file: File):
 		var vec2 = Vector2()
@@ -416,14 +357,12 @@ public class DTX
 		vec2.y = file.get_float()
 		return vec2
 
-
 	func read_vector3(file: File):
 		var vec3 = Vector3()
 		vec3.x = file.get_float()
 		vec3.y = file.get_float()
 		vec3.z = file.get_float()
 		return vec3
-
 
 	func read_quat(file: File):
 		var quat = Quat()
@@ -440,7 +379,6 @@ public class DTX
 
 		return this.convert_4x4_to_transform(matrix_4x4)
 
-
 	func convert_4x4_to_transform(matrix):
 		return Transform(
 			Vector3(matrix[0], matrix[4], matrix[8]),
@@ -448,10 +386,8 @@ public class DTX
 			Vector3(matrix[2], matrix[6], matrix[10]),
 			Vector3(matrix[3], matrix[7], matrix[11])
 		)
-
-}
-
 */
+
 public struct Vector2
 {
     public float X, Y;
