@@ -77,19 +77,19 @@ public static class Util
         {
             for (var x = 0; x < texture.Width; x++)
             {
-                if (texture.Format == TextureFormat.RGBA)
+                if (texture.Format == TextureFormat.BGRA)
+                {
+                    blue = texture.PixelData[i++];
+                    green = texture.PixelData[i++];
+                    red = texture.PixelData[i++];
+                    alpha = texture.PixelData[i++];
+                }
+                else
                 {
                     red = texture.PixelData[i++];
                     green = texture.PixelData[i++];
                     blue = texture.PixelData[i++];
                     alpha = texture.PixelData[i++];
-                }
-                else if (texture.Format == TextureFormat.BGRA)
-                {
-                    blue = texture.PixelData[i++];
-                    green = texture.PixelData[i++];
-                    red = texture.PixelData[i++];
-                    alpha = texture.PixelData[i++];                    
                 }
 
                 ret[x, y] = new Rgba32(red, green, blue, alpha);

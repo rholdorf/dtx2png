@@ -15,8 +15,20 @@ internal static class Program
             return;
         }
 
-        Do1(args);
+        Do2(args);
     }
+    
+    private static void Do2(string[] args)
+    {
+        var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
+
+        using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
+        using var reader = new BinaryReader(stream);
+
+        var dtxFile = new DTX();
+        dtxFile.Read(reader);
+
+    }    
 
     private static void Do1(string[] args)
     {
