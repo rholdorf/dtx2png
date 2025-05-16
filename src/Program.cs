@@ -18,111 +18,51 @@ internal static class Program
 
         if (!File.Exists(args[0]))
         {
-            Console.WriteLine($"{args[0]} not found.");
+            Error($"{args[0]} not found.");
             return;
         }
-        
-        try
-        {
-            Do2(args);
-        }
-        catch (Exception e)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"ERR: {args[0]} ");
-            Console.ResetColor();
-            Console.WriteLine(e);
-            Console.WriteLine();
-        }
-    }
-
-    private static void Do2(string[] args)
-    {
-        var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], null) : args[1];
 
         using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
         if (stream.Length == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"ERR: {args[0]} is empty.");
-            Console.ResetColor();
-            Console.WriteLine();
+            Error($"{args[0]} is empty.");
             return;
         }
-        
-        using var reader = new BinaryReader(stream);
-        var dtxFile = new Dtx();
-        if (dtxFile.Read(reader))
+
+        try
         {
-            for(var i=0; i<dtxFile.Images.Count; i++)
+            using var reader = new BinaryReader(stream);
+            using var dtxFile = new Dtx();
+            if (dtxFile.Read(reader))
             {
-                var image = dtxFile.Images[i];
-                if (i == 0)
-                {
-                    image.Save($"{outPath}.png", new PngEncoder());
-                    Console.WriteLine($"INF: Saved image to {outPath}.png");
-                }
-                else
-                {
-                    var another = $"{outPath}_{i}.png"; 
-                    image.Save(another, new PngEncoder());
-                    Console.WriteLine($"INF: Saved image to {another}");
-                }
-            }            
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"ERR: {args[0]} - no image to save.");
-            Console.ResetColor();
-        }
-    }    
-
-    private static void Do1(string[] args)
-    {
-        var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
-
-        using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
-        using var reader = new BinaryReader(stream);
-
-        var dtxFile = new DtxFile(reader);
-        Util.PrintDtxInfo(dtxFile);
-        if (!dtxFile.Header.Supported)
-        {
-            Console.WriteLine("ERR: Unsupported DTX format.");
-            return;
-        }
-
-        if (dtxFile.Textures?.Count == 0)
-        {
-            Console.WriteLine("ERR: No dtx textures found.");
-            return;
-        }
-        
-        var imageIndex = 0;
-        if (dtxFile.Textures == null || dtxFile.Textures.Count == 0)
-        {
-            Console.WriteLine("ERR: No dtx textures found.");
-            return;
-        }
-        
-        foreach (var current in dtxFile.Textures)
-        {
-            using var img = Util.FromTexture(current);
-
-            if (imageIndex == 0)
-            {
-                img.Save(outPath);
-                Console.WriteLine($"Saved image to {outPath}");
+                var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], null) : args[1];
+                SaveImagesAsPng(dtxFile, outPath);                
             }
             else
             {
-                var mipPath = Path.ChangeExtension(outPath, $"_mipmap_{imageIndex}.png");
-                img.Save(mipPath);
-                Console.WriteLine($"Saved mipmap {imageIndex} to {mipPath}");
+                Error(dtxFile.Error);
             }
+        }
+        catch (Exception e)
+        {
+            Error(e.ToString());
+        }
+    }
 
-            imageIndex++;
+    private static void Error(string msg)
+    {
+        Console.Error.Write($"ERR: ");
+        Console.Error.WriteLine(msg);
+    }
+    
+    private static void SaveImagesAsPng(Dtx dtxFile, string outPath)
+    {
+        for (var i = 0; i < dtxFile.Images.Count; i++)
+        {
+            var image = dtxFile.Images[i];
+            var filename = i == 0 ? $"{outPath}.png" : $"{outPath}_{i}.png";
+            image.Save(filename, new PngEncoder());
+            Console.WriteLine($"INF: Saved image to {filename}");
         }
     }
 }

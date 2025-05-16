@@ -72,7 +72,7 @@ public static class Util
     {
         var ret = new Image<Rgba32>(texture.Width, texture.Height);
         var i = 0;
-        byte red = 0, green = 0, blue = 0, alpha = 0;
+        byte red, green, blue, alpha;
         for (var y = 0; y < texture.Height; y++)
         {
             for (var x = 0; x < texture.Width; x++)

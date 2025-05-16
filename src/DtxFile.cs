@@ -1,17 +1,13 @@
-using System.Diagnostics;
 using BCnEncoder.Decoder;
 using BCnEncoder.Shared;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace dtx2png;
 
 public class DtxFile
 {
-    const int DTX5_BLOCK_BYTES = 16;
-    const int DTX1_BLOCK_BYTES = 8;
-    const int HEADER_SIZE = 52;
+    private const int DTX5_BLOCK_BYTES = 16;
+    private const int DTX1_BLOCK_BYTES = 8;
+    private const int HEADER_SIZE = 52;
 
     public Header Header { get; }
     public List<Texture>? Textures { get; }
@@ -29,7 +25,7 @@ public class DtxFile
             if (Header.Fmt3 == 0)
             {
                 reader.BaseStream.Seek(4, SeekOrigin.Current);
-                for (int i = 0; i < Header.MipmapCount; i++)
+                for (var i = 0; i < Header.MipmapCount; i++)
                 {
                     Textures.Add(ReadColorData(reader, Header.Width, Header.Height, TextureFormat.BGRA));
                 }
@@ -45,7 +41,7 @@ public class DtxFile
         }
         else
         {
-            Console.WriteLine("Unknown format.");
+            Console.WriteLine("INF: Unknown format.");
         }
 
     }
