@@ -76,7 +76,7 @@ public class Dtx
 
 		if (DTX_VERSION_LT1 != version && DTX_VERSION_LT15 != version && DTX_VERSION_LT2 != version)
 		{
-			Console.WriteLine($"Unsupported file version {version}");
+			Console.WriteLine($"ERR: {((FileStream)f.BaseStream).Name} - Unsupported file version {version}");
 			return null;
 		}
 
@@ -135,7 +135,7 @@ public class Dtx
 			if (f.BaseStream.Position != f.BaseStream.Length)
 			{
 				// more stuff
-				Console.WriteLine($"WAR: {f.BaseStream.Length - f.BaseStream.Position} bytes not read!");
+				Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - {f.BaseStream.Length - f.BaseStream.Position} bytes not read!");
 			}
 			
 			return image;
@@ -143,13 +143,12 @@ public class Dtx
 		
 		if (BPP_32 == bytes_per_pixel)
 		{
-			Console.WriteLine("WAR: 32bit Texture not implemented");
 			return Read32bitTexture(f);
 		}
 		
 		if (BPP_32P == bytes_per_pixel)
 		{
-			Console.WriteLine("WAR: 32bit Palette not implemented");
+			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - 32bit Palette not implemented");
 			//Read32BitPalette(f);
 		}
 
@@ -179,7 +178,7 @@ public class Dtx
 		var readCount = f.Read(data, 0, data.Length);
 		if (data.Length != readCount)
 		{
-			Console.WriteLine($"WAR: Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {format} data");
+			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {format} data");
 		}
 		
 		using var ms = new MemoryStream(data);
@@ -208,7 +207,7 @@ public class Dtx
 		var readCount = f.Read(buffer, 0, buffer.Length);
 		if (bufferSize != readCount)
 		{
-			Console.WriteLine($"WAR: Failed to read all {bufferSize} bytes (only {readCount} bytes read) for 8bit palette data");
+			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name}Failed to read all {bufferSize} bytes (only {readCount} bytes read) for 8bit palette data");
 		}
 		
 		for (var i = 0; i < readCount; i++)
@@ -231,7 +230,7 @@ public class Dtx
 		var readCount = f.Read(data, 0, data.Length);
 		if (size != readCount)
 		{
-			Console.WriteLine($"WAR: Inconsistent read. Should be {size}, but {readCount} bytes where read.");
+			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name}Inconsistent read. Should be {size}, but {readCount} bytes where read.");
 			return null;
 		}
 
@@ -243,9 +242,9 @@ public class Dtx
 				var r = data[i++];
 				var g = data[i++];
 				var b = data[i++];
-				var a = data[i++];
+				i++; // alpha seems to be incorrect, skip it
 				
-				ret[x, y] = new Rgba32(r, g, b, a);
+				ret[x, y] = new Rgba32(r, g, b, 0xff);
 			}
 		}
 

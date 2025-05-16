@@ -28,9 +28,10 @@ internal static class Program
         catch (Exception e)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write("ERR: ");
+            Console.Write($"ERR: {args[0]}");
             Console.ResetColor();
             Console.WriteLine(e);
+            Console.WriteLine();
         }
     }
 
@@ -52,7 +53,7 @@ internal static class Program
         }
         
         img.Save(outPath);
-        Console.WriteLine($"INF: Saved image to {outPath}");
+        //Console.WriteLine($"INF: Saved image to {outPath}");
     }    
 
     private static void Do1(string[] args)
@@ -77,6 +78,12 @@ internal static class Program
         }
         
         var imageIndex = 0;
+        if (dtxFile.Textures == null || dtxFile.Textures.Count == 0)
+        {
+            Console.WriteLine("ERR: No dtx textures found.");
+            return;
+        }
+        
         foreach (var current in dtxFile.Textures)
         {
             using var img = Util.FromTexture(current);
