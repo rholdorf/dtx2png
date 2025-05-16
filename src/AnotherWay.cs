@@ -63,6 +63,8 @@ public class Dtx
 	private int detail_texture_angle = 0;
 	private string command_string = "";
 
+	private TextureFormat format = TextureFormat.Unknown;
+
 	public string PixelFormat = string.Empty;
 
 	public Image<Rgba32>? Read(BinaryReader f)
@@ -83,10 +85,10 @@ public class Dtx
 		width = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
 		height = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
 		mipmap_count = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
-		section_count = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
-		flags = f.ReadUInt32(); // get_32 - unsigned integer as 32 bits
+		section_count = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits (format 1)
+		flags = f.ReadUInt32(); // get_32 - unsigned integer as 32 bits (format 2)
 		user_flags = f.ReadUInt32(); // get_32 - unsigned integer as 32 bits
-		texture_group = f.ReadByte(); // get_8 - integer as 8 bits
+		texture_group = f.ReadByte(); // get_8 - integer as 8 bits (format 3)
 		mipmaps_to_use = f.ReadByte(); // get_8 - integer as 8 bits
 		bytes_per_pixel = f.ReadByte(); // get_8 - integer as 8 bits
 		mipmap_offset = f.ReadByte(); // get_8 - integer as 8 bits
@@ -99,7 +101,19 @@ public class Dtx
 		{
 			command_string = Encoding.ASCII.GetString(f.ReadBytes(DTX_COMMANDSTRING_LENGTH)).TrimEnd('\0');
 		}
-		
+
+		format = flags switch
+		{
+			136 => TextureFormat.RGBA,
+			8 => texture_group switch
+			{
+				0 => TextureFormat.BGRA,
+				1 => TextureFormat.DXT1,
+				_ => format
+			},
+			_ => format
+		};
+
 		return ReadTextureData(f);
 	}
 	
@@ -158,16 +172,16 @@ public class Dtx
 	private Image<Rgba32>? ReadCompressed(BinaryReader f)
 	{
 		var decoder = new BcDecoder();
-		var format = CompressionFormat.Bc1; // DXT1
+		var compressionFormat = CompressionFormat.Bc1; // DXT1
 		var scale = 8;
 		switch (bytes_per_pixel)
 		{
 			case BPP_S3TC_DXT3:
-				format = CompressionFormat.Bc2; // DXT3
+				compressionFormat = CompressionFormat.Bc2; // DXT3
 				scale = 16;
 				break;
 			case BPP_S3TC_DXT5:
-				format = CompressionFormat.Bc3; // DXT5
+				compressionFormat = CompressionFormat.Bc3; // DXT5
 				scale = 16;
 				break;
 		}
@@ -178,11 +192,11 @@ public class Dtx
 		var readCount = f.Read(data, 0, data.Length);
 		if (data.Length != readCount)
 		{
-			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {format} data");
+			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {compressionFormat} data");
 		}
 		
 		using var ms = new MemoryStream(data);
-		return decoder.DecodeRawToImageRgba32(ms, width, height, format);
+		return decoder.DecodeRawToImageRgba32(ms, width, height, compressionFormat);
 	}
 
 	private Image<Rgba32> Read8BitPalette(BinaryReader f)
@@ -230,22 +244,34 @@ public class Dtx
 		var readCount = f.Read(data, 0, data.Length);
 		if (size != readCount)
 		{
-			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name}Inconsistent read. Should be {size}, but {readCount} bytes where read.");
+			Console.WriteLine(
+				$"WAR: {((FileStream)f.BaseStream).Name}Inconsistent read. Should be {size}, but {readCount} bytes where read.");
 			return null;
 		}
 
 		var i = 0;
+		byte r, g, b, a;
 		for (var y = 0; y < height; y++)
+		for (var x = 0; x < width; x++)
 		{
-			for (var x = 0; x < width; x++)
+			if (format == TextureFormat.BGRA)
 			{
-				var r = data[i++];
-				var g = data[i++];
-				var b = data[i++];
-				i++; // alpha seems to be incorrect, skip it
-				
-				ret[x, y] = new Rgba32(r, g, b, 0xff);
+				b = data[i++];
+				g = data[i++];
+				r = data[i++];
+				a = data[i++];
 			}
+			else
+			{
+				r = data[i++];
+				g = data[i++];
+				b = data[i++];
+				// alpha seems to be incorrect, skip it
+				i++;
+				a = 0xFF;
+			}
+
+			ret[x, y] = new Rgba32(r, g, b, a);
 		}
 
 		return ret;

@@ -20,7 +20,7 @@ internal static class Program
             Console.WriteLine($"{args[0]} not found.");
             return;
         }
-
+        
         try
         {
             Do2(args);
@@ -28,7 +28,7 @@ internal static class Program
         catch (Exception e)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"ERR: {args[0]}");
+            Console.Write($"ERR: {args[0]} ");
             Console.ResetColor();
             Console.WriteLine(e);
             Console.WriteLine();
@@ -40,8 +40,17 @@ internal static class Program
         var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
 
         using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
+        if (stream.Length == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write($"ERR: {args[0]} is empty.");
+            Console.ResetColor();
+            Console.WriteLine();
+            return;
+        }
+        
         using var reader = new BinaryReader(stream);
-
+        
         var dtxFile = new Dtx();
         using var img = dtxFile.Read(reader);
         if (img is null)
