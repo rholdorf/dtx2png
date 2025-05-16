@@ -1,12 +1,13 @@
-using System.Diagnostics;
 using System.Text;
 using BCnEncoder.Decoder;
+using BCnEncoder.ImageSharp;
 using BCnEncoder.Shared;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 
-public class DTX
+namespace dtx2png;
+
+public class Dtx
 {
 	public const int DTX_VERSION_LT1 = -2;
 	public const int DTX_VERSION_LT15 = -3;
@@ -54,17 +55,17 @@ public class DTX
 	private uint user_flags = 0;
 	private int texture_group = 0;
 	private int mipmaps_to_use = 0;
-	private int bytes_per_pixel = 0;
+	public int bytes_per_pixel = 0;
 	private int mipmap_offset = 0;
 	private int mipmap_tex_coord_offset = 0;
 	private int texture_priority = 0;
 	private float detail_texture_scale = 0.0f;
 	private int detail_texture_angle = 0;
 	private string command_string = "";
-	private Image<Rgba32> image;
 
+	public string PixelFormat = string.Empty;
 
-	public void Read(BinaryReader f)
+	public Image<Rgba32>? Read(BinaryReader f)
 	{
 		resource_type = f.ReadInt32();
 
@@ -75,8 +76,8 @@ public class DTX
 
 		if (DTX_VERSION_LT1 != version && DTX_VERSION_LT15 != version && DTX_VERSION_LT2 != version)
 		{
-			Debug.WriteLine($"Unsupported file version {version}");
-			return;
+			Console.WriteLine($"Unsupported file version {version}");
+			return null;
 		}
 
 		width = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
@@ -99,84 +100,77 @@ public class DTX
 			command_string = Encoding.ASCII.GetString(f.ReadBytes(DTX_COMMANDSTRING_LENGTH)).TrimEnd('\0');
 		}
 		
-		ReadTextureData(f);
+		return ReadTextureData(f);
 	}
 	
-	/*
-    func read_texture_data(f: File):
-	   		var image: Image = null
-	   
-	   		if [DTX_VERSION_LT1, DTX_VERSION_LT15].has(this.version) or this.bytes_per_pixel == BPP_8P:
-	   			image = this.read_8bit_palette(f)
-	   		elif [BPP_S3TC_DXT1, BPP_S3TC_DXT3, BPP_S3TC_DXT5].has(this.bytes_per_pixel):
-	   			image = this.read_compressed(f)
-	   		elif this.bytes_per_pixel == BPP_32:
-	   			image = this.read_32bit_texture(f)
-	   		elif this.bytes_per_pixel == BPP_32P:
-	   			image = this.read_32bit_palette(f)
-	   
-	   		return image	 
-	 */
-	private void ReadTextureData(BinaryReader f)
+	private Image<Rgba32>? ReadTextureData(BinaryReader f)
 	{
 		if (DTX_VERSION_LT1 == version || DTX_VERSION_LT15 == version || bytes_per_pixel == BPP_8P)
 		{
-			Read8BitPalette(f);
+			return Read8BitPalette(f);
 		}
-		else if (BPP_S3TC_DXT1 == bytes_per_pixel || 
+		
+		if (BPP_S3TC_DXT1 == bytes_per_pixel || 
 		         BPP_S3TC_DXT3 == bytes_per_pixel || 
 		         BPP_S3TC_DXT5 == bytes_per_pixel)
 		{
-			//for (var i = 0; i < mipmap_count; i++)
+			Image<Rgba32>? image = null;
+			
+			var originalWidth = width;
+			var originalHeight = height;
+			for (var i = 0; i < mipmap_count; i++)
 			{
-				//width = Util.DivideByPowerOfTwo(width, i);
-				//height = Util.DivideByPowerOfTwo(height, i);
-				ReadCompressed(f);
+				width = Util.DivideByPowerOfTwo(originalWidth, i);
+				height = Util.DivideByPowerOfTwo(originalHeight, i);
+				if (i == 0)
+					image = ReadCompressed(f); // keep only the first
+				else
+				{
+					using var mipmap = ReadCompressed(f); // read the data, but ignore it for now
+				}
 			}
-		}
-		else if (BPP_32 == bytes_per_pixel)
+
+			width = originalWidth;
+			height = originalHeight;
+			if (f.BaseStream.Position != f.BaseStream.Length)
+			{
+				// more stuff
+				Console.WriteLine($"WAR: {f.BaseStream.Length - f.BaseStream.Position} bytes not read!");
+			}
+			
+			return image;
+		} 
+		
+		if (BPP_32 == bytes_per_pixel)
 		{
-			//Read32BitTexture(f);
+			Console.WriteLine("WAR: 32bit Texture not implemented");
+			return Read32bitTexture(f);
 		}
-		else if (BPP_32P == bytes_per_pixel)
+		
+		if (BPP_32P == bytes_per_pixel)
 		{
+			Console.WriteLine("WAR: 32bit Palette not implemented");
 			//Read32BitPalette(f);
 		}
+
+		return null;
 	}
 	
-	/*
-	func read_compressed(f: File):
-	   	var image = Image.new()
-	   	var format = Image.FORMAT_DXT1
-	   	var scale = 8
-
-	   	if this.bytes_per_pixel == BPP_S3TC_DXT3:
-	   		format = Image.FORMAT_DXT3
-	   		scale = 16
-	   	elif this.bytes_per_pixel == BPP_S3TC_DXT5:
-	   		format = Image.FORMAT_DXT5
-	   		scale = 16
-
-	   	var compressed_width = int((this.width + 3) / 4)
-	   	var compressed_height = int((this.height + 3) / 4)
-	   	var data = f.get_buffer(compressed_width * compressed_height * scale)
-	   	image.create_from_data(this.width, this.height, false, format, data)
-	   	return image	 
-	 */
-	private void ReadCompressed(BinaryReader f)
+	private Image<Rgba32>? ReadCompressed(BinaryReader f)
 	{
 		var decoder = new BcDecoder();
 		var format = CompressionFormat.Bc1; // DXT1
 		var scale = 8;
-		if (BPP_S3TC_DXT3 == bytes_per_pixel)
+		switch (bytes_per_pixel)
 		{
-			format = CompressionFormat.Bc2; // DXT3
-			scale = 16;
-		}
-		else if (BPP_S3TC_DXT5 == bytes_per_pixel)
-		{
-			format = CompressionFormat.Bc3; // DXT5
-			scale = 16;
+			case BPP_S3TC_DXT3:
+				format = CompressionFormat.Bc2; // DXT3
+				scale = 16;
+				break;
+			case BPP_S3TC_DXT5:
+				format = CompressionFormat.Bc3; // DXT5
+				scale = 16;
+				break;
 		}
 		
 		var compressedWidth = (width + 3) / 4;
@@ -185,77 +179,20 @@ public class DTX
 		var readCount = f.Read(data, 0, data.Length);
 		if (data.Length != readCount)
 		{
-			Debug.WriteLine($"Failed to read {data.Length} bytes: {readCount} bytes read");
-			return;
+			Console.WriteLine($"WAR: Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {format} data");
 		}
 		
-		var blockSize = decoder.GetBlockSize(format);
-		var blockCount = data.Length / blockSize;
-		image = new Image<Rgba32>(width, height);
-
-		var curX = 0;
-		var curY = 0;
-			
-		for (var i = 0; i < blockCount; i++)
-		{
-			var block = new byte[blockSize];
-			Array.Copy(data, i * blockSize, block, 0, blockSize);
-			var decodedBlock = decoder.DecodeBlock(block, format);
-			
-			var decodedBlockSpan = decodedBlock.Span;
-			for (var y = 0; y < decodedBlock.Height; y++)
-			{
-				for (var x = 0; x < decodedBlock.Width; x++)
-				{
-					var pixel = decodedBlockSpan[y,x];
-					image[curX + x, curY + y] = new Rgba32(pixel.r, pixel.g, pixel.b, pixel.a);
-				}
-			}
-
-			curX += decodedBlock.Width;
-			if (curX < width) continue;
-			curX = 0;
-			curY += decodedBlock.Height;
-		}
-
-		image.Save("/Users/rui/src/tron/scratch/CELLPHONE_x.png", new PngEncoder());
+		using var ms = new MemoryStream(data);
+		return decoder.DecodeRawToImageRgba32(ms, width, height, format);
 	}
-	
-	/*
-	func read_8bit_palette(f: File):
-	   	var image = Image.new()
-	   	var palette = []
-	   	var _palette_header_1 = f.ReadUInt32()
-	   	var _palette_header_2 = f.ReadUInt32()
 
-	   	for _i in range(256):
-	   		var a = f.ReadByte()
-	   		var r = f.ReadByte()
-	   		var g = f.ReadByte()
-	   		var b = f.ReadByte()
-	   		palette.append(Quat(r, g, b, a))
-
-	   	var data = f.get_buffer(this.width * this.height * 1)
-	   	var colour_data = PoolByteArray()
-	   	var i = 0
-
-	   	while (i < data.size()):
-	   		colour_data.append(palette[data[i]].x)
-	   		colour_data.append(palette[data[i]].y)
-	   		colour_data.append(palette[data[i]].z)
-	   		colour_data.append(palette[data[i]].w)
-	   		i += 1
-
-	   	image.create_from_data(this.width, this.height, false, Image.FORMAT_RGBA8, colour_data)
-	   	return image
-	 */
-	private void Read8BitPalette(BinaryReader f)
+	private Image<Rgba32> Read8BitPalette(BinaryReader f)
 	{
-		var image = new Image<Rgba32>(width, height);
+		var ret = new Image<Rgba32>(width, height);
 		var palette = new List<Quat>();
 
-		var paletteHeader1 = f.ReadUInt32();
-		var paletteHeader2 = f.ReadUInt32();
+		_ = f.ReadUInt32();
+		_ = f.ReadUInt32();
 
 		for (var i = 0; i < 256; i++)
 		{
@@ -271,15 +208,48 @@ public class DTX
 		var readCount = f.Read(buffer, 0, buffer.Length);
 		if (bufferSize != readCount)
 		{
-			Debug.WriteLine($"Failed to read {bufferSize} bytes: {readCount} bytes read");
-			return;
+			Console.WriteLine($"WAR: Failed to read all {bufferSize} bytes (only {readCount} bytes read) for 8bit palette data");
 		}
-
-		for (var i = 0; i < buffer.Length; i++)
+		
+		for (var i = 0; i < readCount; i++)
 		{
-			image[i % width, i / width] = new Rgba32(palette[buffer[i]].X, palette[buffer[i]].Y, palette[buffer[i]].Z,
+			ret[i % width, i / width] = new Rgba32(
+				palette[buffer[i]].X, 
+				palette[buffer[i]].Y,
+				palette[buffer[i]].Z,
 				palette[buffer[i]].W);
 		}
+
+		return ret;
+	}
+
+	private Image<Rgba32>? Read32bitTexture(BinaryReader f)
+	{
+		var ret = new Image<Rgba32>(width, height);
+		var size = width * height * 4;
+		var data = new byte[size];
+		var readCount = f.Read(data, 0, data.Length);
+		if (size != readCount)
+		{
+			Console.WriteLine($"WAR: Inconsistent read. Should be {size}, but {readCount} bytes where read.");
+			return null;
+		}
+
+		var i = 0;
+		for (var y = 0; y < height; y++)
+		{
+			for (var x = 0; x < width; x++)
+			{
+				var r = data[i++];
+				var g = data[i++];
+				var b = data[i++];
+				var a = data[i++];
+				
+				ret[x, y] = new Rgba32(r, g, b, a);
+			}
+		}
+
+		return ret;
 	}
 }
 
@@ -332,24 +302,12 @@ public class DTX
 		image.create_from_data(this.width, this.height, false, Image.FORMAT_RGBA8, colour_data)
 		return image
 
-	func _make_response(code, message = ""):
-		return {"code": code, "message": message}
-
 	func convert_32_to_8_bit(value):
 		var a = (value & -16777216) >> 24
 		var r = (value & 16711680) >> 16
 		var g = (value & 65280) >> 8
 		var b = (value & 255)
 		return Quat(r, g, b, a)
-
-	func read_string(file: File, is_length_a_short = true):
-		var length = 0
-		if is_length_a_short:
-			length = file.ReadUInt16()
-		else:
-			length = file.ReadUInt32()
-
-		return file.get_buffer(length).get_string_from_ascii()
 
 	func read_vector2(file: File):
 		var vec2 = Vector2()
@@ -390,42 +348,27 @@ public class DTX
 
 public struct Vector2
 {
-    public float X, Y;
-    public Vector2(float x, float y) { X = x; Y = y; }
+	public float X, Y;
+	public Vector2(float x, float y) { X = x; Y = y; }
 }
 
 public struct Vector3
 {
-    public float X, Y, Z;
-    public Vector3(float x, float y, float z) { X = x; Y = y; Z = z; }
+	public float X, Y, Z;
+	public Vector3(float x, float y, float z) { X = x; Y = y; Z = z; }
 }
 
 public struct Quat
 {
-    public float X, Y, Z, W;
-    public Quat(float x, float y, float z, float w) { X = x; Y = y; Z = z; W = w; }
+	public float X, Y, Z, W;
+	public Quat(float x, float y, float z, float w) { X = x; Y = y; Z = z; W = w; }
 }
-
-// public class Image
-// {
-//     public int Width, Height;
-//     public byte[] Data;
-//     public string Format;
-//
-//     public void CreateFromData(int width, int height, string format, byte[] data)
-//     {
-//         Width = width;
-//         Height = height;
-//         Format = format;
-//         Data = data;
-//     }
-// }
 
 public struct Transform
 {
-    public Vector3 XAxis, YAxis, ZAxis, Origin;
-    public Transform(Vector3 x, Vector3 y, Vector3 z, Vector3 origin)
-    {
-        XAxis = x; YAxis = y; ZAxis = z; Origin = origin;
-    }
+	public Vector3 XAxis, YAxis, ZAxis, Origin;
+	public Transform(Vector3 x, Vector3 y, Vector3 z, Vector3 origin)
+	{
+		XAxis = x; YAxis = y; ZAxis = z; Origin = origin;
+	}
 }

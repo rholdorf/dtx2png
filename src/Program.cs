@@ -15,9 +15,25 @@ internal static class Program
             return;
         }
 
-        Do2(args);
+        if (!File.Exists(args[0]))
+        {
+            Console.WriteLine($"{args[0]} not found.");
+            return;
+        }
+
+        try
+        {
+            Do2(args);
+        }
+        catch (Exception e)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write("ERR: ");
+            Console.ResetColor();
+            Console.WriteLine(e);
+        }
     }
-    
+
     private static void Do2(string[] args)
     {
         var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
@@ -25,9 +41,18 @@ internal static class Program
         using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
         using var reader = new BinaryReader(stream);
 
-        var dtxFile = new DTX();
-        dtxFile.Read(reader);
-
+        var dtxFile = new Dtx();
+        using var img = dtxFile.Read(reader);
+        if (img is null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"ERR: {args[0]} - no image to save.");
+            Console.ResetColor();
+            return;
+        }
+        
+        img.Save(outPath);
+        Console.WriteLine($"INF: Saved image to {outPath}");
     }    
 
     private static void Do1(string[] args)
