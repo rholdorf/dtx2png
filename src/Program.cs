@@ -2,6 +2,7 @@
 using SixLabors.ImageSharp.PixelFormats;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace dtx2png;
 
@@ -37,7 +38,7 @@ internal static class Program
 
     private static void Do2(string[] args)
     {
-        var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], ".png") : args[1];
+        var outPath = args.Length < 2 ? Path.ChangeExtension(args[0], null) : args[1];
 
         using var stream = new FileStream(args[0], FileMode.Open, FileAccess.Read);
         if (stream.Length == 0)
@@ -50,19 +51,31 @@ internal static class Program
         }
         
         using var reader = new BinaryReader(stream);
-        
         var dtxFile = new Dtx();
-        using var img = dtxFile.Read(reader);
-        if (img is null)
+        if (dtxFile.Read(reader))
+        {
+            for(var i=0; i<dtxFile.Images.Count; i++)
+            {
+                var image = dtxFile.Images[i];
+                if (i == 0)
+                {
+                    image.Save($"{outPath}.png", new PngEncoder());
+                    Console.WriteLine($"INF: Saved image to {outPath}.png");
+                }
+                else
+                {
+                    var another = $"{outPath}_{i}.png"; 
+                    image.Save(another, new PngEncoder());
+                    Console.WriteLine($"INF: Saved image to {another}");
+                }
+            }            
+        }
+        else
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"ERR: {args[0]} - no image to save.");
             Console.ResetColor();
-            return;
         }
-        
-        img.Save(outPath);
-        //Console.WriteLine($"INF: Saved image to {outPath}");
     }    
 
     private static void Do1(string[] args)

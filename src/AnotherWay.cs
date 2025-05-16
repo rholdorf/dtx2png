@@ -3,6 +3,7 @@ using BCnEncoder.Decoder;
 using BCnEncoder.ImageSharp;
 using BCnEncoder.Shared;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace dtx2png;
@@ -67,7 +68,9 @@ public class Dtx
 
 	public string PixelFormat = string.Empty;
 
-	public Image<Rgba32>? Read(BinaryReader f)
+	public List<Image<Rgba32>> Images = new List<Image<Rgba32>>();
+
+	public bool Read(BinaryReader f)
 	{
 		resource_type = f.ReadInt32();
 
@@ -79,7 +82,7 @@ public class Dtx
 		if (DTX_VERSION_LT1 != version && DTX_VERSION_LT15 != version && DTX_VERSION_LT2 != version)
 		{
 			Console.WriteLine($"ERR: {((FileStream)f.BaseStream).Name} - Unsupported file version {version}");
-			return null;
+			return false;
 		}
 
 		width = f.ReadUInt16(); // get_16 - unsigned integer as 16 bits
@@ -113,63 +116,75 @@ public class Dtx
 			},
 			_ => format
 		};
-
+		
 		return ReadTextureData(f);
 	}
 	
-	private Image<Rgba32>? ReadTextureData(BinaryReader f)
+	private bool ReadTextureData(BinaryReader f)
 	{
 		if (DTX_VERSION_LT1 == version || DTX_VERSION_LT15 == version || bytes_per_pixel == BPP_8P)
 		{
-			return Read8BitPalette(f);
+			var image = Read8BitPalette(f);
+			Images.Add(image);
+			return true;
 		}
 		
 		if (BPP_S3TC_DXT1 == bytes_per_pixel || 
 		         BPP_S3TC_DXT3 == bytes_per_pixel || 
 		         BPP_S3TC_DXT5 == bytes_per_pixel)
 		{
-			Image<Rgba32>? image = null;
-			
 			var originalWidth = width;
 			var originalHeight = height;
-			for (var i = 0; i < mipmap_count; i++)
+			while (f.BaseStream.Position < f.BaseStream.Length)
 			{
-				width = Util.DivideByPowerOfTwo(originalWidth, i);
-				height = Util.DivideByPowerOfTwo(originalHeight, i);
-				if (i == 0)
-					image = ReadCompressed(f); // keep only the first
-				else
+				if (Images.Count == 1)
 				{
-					using var mipmap = ReadCompressed(f); // read the data, but ignore it for now
+					f.BaseStream.Seek(32, SeekOrigin.Current); // TODO: what are these bytes after the "first" image?
 				}
+				
+				for (var i = 0; i < mipmap_count; i++)
+				{
+					width = Util.DivideByPowerOfTwo(originalWidth, i);
+					height = Util.DivideByPowerOfTwo(originalHeight, i);
+					if (i == 0)
+					{
+						Images.Add(ReadCompressed(f)); // keep only the first
+					}
+					else
+					{
+						using var mipmap = ReadCompressed(f); // read the data, but ignore it for now
+					}
+				}
+				
+				width = originalWidth;
+				height = originalHeight;
 			}
 
-			width = originalWidth;
-			height = originalHeight;
-			if (f.BaseStream.Position != f.BaseStream.Length)
-			{
-				// more stuff
-				Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - {f.BaseStream.Length - f.BaseStream.Position} bytes not read!");
-			}
-			
-			return image;
+			return true;
 		} 
 		
 		if (BPP_32 == bytes_per_pixel)
 		{
-			return Read32bitTexture(f);
+			var image = Read32bitTexture(f);
+			if(image == null)
+				return false;
+			
+			Images.Add(image);
+			return true;
 		}
 		
 		if (BPP_32P == bytes_per_pixel)
 		{
 			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - 32bit Palette not implemented");
+			return false;
 			//Read32BitPalette(f);
 		}
 
-		return null;
+		Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - Unknown format");
+		return false;
 	}
 	
-	private Image<Rgba32>? ReadCompressed(BinaryReader f)
+	private Image<Rgba32> ReadCompressed(BinaryReader f)
 	{
 		var decoder = new BcDecoder();
 		var compressionFormat = CompressionFormat.Bc1; // DXT1
@@ -188,9 +203,10 @@ public class Dtx
 		
 		var compressedWidth = (width + 3) / 4;
 		var compressedHeight = (height + 3) / 4;
-		var data = new byte[compressedWidth * compressedHeight * scale];
-		var readCount = f.Read(data, 0, data.Length);
-		if (data.Length != readCount)
+		var length = compressedWidth * compressedHeight * scale;
+		var data = new byte[length];
+		var readCount = f.Read(data, 0, length);
+		if (length != readCount)
 		{
 			Console.WriteLine($"WAR: {((FileStream)f.BaseStream).Name} - Failed to read all {data.Length} bytes (only {readCount} bytes read) for Compressed {compressionFormat} data");
 		}
